@@ -1,0 +1,22 @@
+Mar 7th
+- Setup Git repo for this project (done)
+- Install Coil with QZFM into Mini-MSR (done)
+- Check zeroing (done)
+- Write/Adapt simultaneous cell and coil measurement. (done)
+- Check cell is responding, by moving screw driver nearer at 90 percent (done)
+
+Mar 8th
+- Finish soldering connections (done)
+- Connect AWG, test AWG is working by seeing if sine wave can be seen (no)
+- connect awg directly into labjack to see if signal is being outputted (initially no, but now yes with changed adapter)
+- got additional adapter (done)
+- check if sine wave can be seen now (yes)
+- put on second layer ()
+
+Mar 11th
+- measure 0-10nT pp at 162 Hz (done)
+- measure 0-10nT pp at 50 Hz (done)
+- potential beating effect, notch filter 60 in analysis
+- frequency sweep between 1 and 500 Hz over 100 seconds, big amplitude variations
+- try sweep without highpass filter
+- measure 0-10nT pp at 35 Hz 
