@@ -12,11 +12,29 @@ Mar 8th
 - got additional adapter (done)
 - check if sine wave can be seen now (yes)
 - put on second layer ()
-
+ 
 Mar 11th
 - measure 0-10nT pp at 162 Hz (done)
 - measure 0-10nT pp at 50 Hz (done)
 - potential beating effect, notch filter 60 in analysis
 - frequency sweep between 1 and 500 Hz over 100 seconds, big amplitude variations
 - try sweep without highpass filter
-- measure 0-10nT pp at 35 Hz 
+- definitely there is a frequency dependence
+
+Mar 12th
+- Overall goal: to fully automate everything
+1. get multimeter working (done)
+2. figure out getting reading from multimeter in python (done)
+3. figure out how to communicate with Rigol (done)
+4. test outputting waves with Rigol (done)
+5. write main script (done)
+6. Take measurement for 35 Hz (done)
+
+Mar 13th
+- take measurement for 200 Hz
+- Edit existing csv file to convert Vamp to Vpp (done)
+- Write function to automatically create folder 
+- iterate through frequencies between 20-100 Hz
+- clean y axis coil
+- solidworks model for x axis coil
+- 

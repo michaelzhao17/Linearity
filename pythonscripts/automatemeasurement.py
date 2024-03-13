@@ -1,5 +1,5 @@
 # mar 2024
-# pure labjack measure
+# to fully automate linearity measurements
 
 from QZFM import QZFM
 import os, glob, time, sys
@@ -16,7 +16,25 @@ import pandas as pd
 from tqdm import tqdm
 from scipy import signal
 from scipy.signal import butter, lfilter
+import pyvisa 
+from SiglentDevices import DG1032Z
+import pathlib
+#%% initialize instruments as objects
+rm = pyvisa.ResourceManager()
+#print(rm.list_resources())
+
+# Digital Multimeter
+DMM = rm.open_resource('USB0::0x1334::0x0204::262800066::INSTR')
+DMM.read_termination = '\n'
+DMM.write_termination = '\n'
+DMM.query('*IDN?')
+
+# Digital Oscilloscope
+awg = DG1032Z(hostname='USB0::0x1AB1::0x0642::DG1ZA232603182::INSTR')
+awg.query('*IDN?')
+
 #%%
+# QZFM
 q = QZFM('COM3')
 #%%
 q.auto_start(zero_calibrate=False)
@@ -99,8 +117,6 @@ def labjack_measure(measurement_length, scanRate, aScanListNames, convfactors=No
         totSkip = 0  # Total skipped samples
         
         i = 1
-        #initialize progress bar
-        progress = tqdm(leave=False, total=MAX_REQUESTS, desc='Measuring Cell')
         
         while i <= MAX_REQUESTS:
             i_start = i
@@ -125,7 +141,6 @@ def labjack_measure(measurement_length, scanRate, aScanListNames, convfactors=No
             # print("  Scans Skipped = %0.0f, Scan Backlogs: Device = %i, LJM = "
             #       "%i" % (curSkip/numAddresses, ret[1], ret[2]))            
             i += 1
-            progress.update(i-i_start)
 
         end = datetime.now()
         
@@ -202,84 +217,128 @@ def labjack_measure(measurement_length, scanRate, aScanListNames, convfactors=No
     # Close handle
     ljm.close(handle)
 
-    return output_ar
+    return output_ar 
+#%% initial configuration
+# AWG settings
+ch = 1
+freq = 200
+offset = 0
+vpp = 1
+waveform = 'SIN'
+res = 2030
+cap = 8.67e-6
+imp = np.sqrt(res**2+1/(2*np.pi*freq*cap)**2)
 
-#%% main measuring script
+awg.set_impedance(ch, imp)
+awg.set_wave(ch, waveform, freq, vpp, offset, phase=0)
+
+# QZFM settings
+gain = '0.33x' # possible gains are 0.1x|0.33x|1x|3x
+# corresponding conversion V/nT for each gain
+gain_dict = {'0.1x':0.27,
+             '0.33x':0.9,
+             '1x':2.7,
+             '3x':8.1}
+q.set_gain(gain)
+zero_t = 10
+t = 3 # number of seconds to record
+axis = 'z' # axis being measured
+
+# save file settings
+save = True # save as csv if True
+fp = '..//data//mar13//'
+#%% auto folder creation function
+def make_folder(fp, axis, freq):
+    '''
+    Parameters
+    ----------
+    fp : str
+        file path to location where folder is to be created
+    axis : str, x|y|z
+        axis being measured.
+    freq : float
+        frequency being measured.
+
+    Returns
+    -------
+    folder_name : str
+        name of folder
+    
+    creates folder and then returns folder name
+    '''
+    folder_name = '{}axis_{}Hz'.format(axis, freq)
+    # check if folder already exists, if not create it
+    pathlib.Path(fp+folder_name).mkdir(parents=True, exist_ok=True) 
+    return folder_name
+
+#%% main script
 if __name__ == '__main__':
-    # measuring length
-    t = 3
+    # iterate over frequencies
+    for freq in [20,  80, 400]:
+        # iterable of Vpp values to output
+        vpps = np.linspace(0.1, 10, 99)
+        i = 0
+        progress = tqdm(leave=False, total=99, desc='Experiment Running')
+        # make folder and get folder name 
+        folder_name = make_folder('..//data//mar13//', axis, freq)
+        
+        for idx, vpp in enumerate(vpps):
+            i_start = i
+            awg.set_wave(ch, waveform, freq, vpp, offset, phase=0)
+            
+            # zero 
+            q.field_zero(True, show=False)
+            # sleep 10 seconds
+            for i in range(zero_t):
+                time_.sleep(1)
+            q.field_zero(False)
+            
+            # turn on AWG
+            awg.set_ch_state(ch, state=True)
+            time_.sleep(2)
+            # measure rms voltage from DMM
+            v_rms_list = []
+            DMM.write('F2')
+            j = 0
+            while j < 50:
+                ret = DMM.query("*TRG")
+                v_rms_list.append(float(ret[:-1]))
+                j += 1
+            # calculate average vrms measured and convert to vpp
+            v_rms_meas = np.mean(v_rms_list)
+            v_pp_meas = round(v_rms_meas * 2 * np.sqrt(2), 2)
+            strV = str(v_pp_meas)
+            print('DMM measures {} Vpp'.format(strV))
+            if len(strV) == 4:
+                pass
+            else:
+                strV = strV + '0'
+                
+            # labjack measure
+            out = labjack_measure(t, 10000, ["AIN2"], [gain_dict[gain]], [10.0])
+            
+            # turn off AWG
+            awg.set_ch_state(ch, state=False)
+            # save data
+            out_df = pd.DataFrame(out.T)
+            out_df.columns = ['Epoch Time', 'z']
+            out_df.set_index("Epoch Time", inplace=True)
+            if save:
+                current_time = datetime.now().strftime('%y%m%dT%H%M%S')
+                out_df.to_csv(fp+folder_name+'//'+strV+'-'+datetime.now().strftime('%y%m%dT%H%M%S')+'.csv')
+            i += 1
+            progress.update(i-i_start)
     
     
-    gain = '0.33x' # possible gains are 0.1x|0.33x|1x|3x
-    save = False # save as csv if True
-    fp = '..//data//mar11//zaxis_35Hz//'
-    
-    # corresponding conversion V/nT for each gain
-    gain_dict = {'0.1x':0.27,
-                 '0.33x':0.9,
-                 '1x':2.7,
-                 '3x':8.1}
-    current_time = datetime.now().strftime('%y%m%dT%H%M%S')
-    # set gain
-    # q.set_gain(gain)
-
-    # zero 
-    q.field_zero(True, show=False)
-    # sleep 10 seconds
-    for i in range(10):
-        time_.sleep(1)
-        print(i)
-    q.field_zero(False)
-    
-    Vrms = float(input('Check voltage with Multimeter, enter result in units of V\n'))
-    V = round(np.sqrt(2)*Vrms, 2) # convert Vrms to Vpp
-    strV = str(V)
-    if len(strV) == 4:
-        pass
-    else:
-        strV = strV + '0'
-    # measure labjack
-    out = labjack_measure(t, 10000, ["AIN2"], [gain_dict[gain]], [10.0])
-    
-    # save data
-    out_df = pd.DataFrame(out.T)
-    out_df.columns = ['Epoch Time', 'z']
-    out_df.set_index("Epoch Time", inplace=True)
-    if save:
-        out_df.to_csv(fp+strV+'-'+datetime.now().strftime('%y%m%dT%H%M%S')+'.csv')
-
-    # last is 3.3 Vrms on the AWG
-#%%
-from scipy.signal import butter, sosfilt, sosfreqz
-def butter_bandpass(lowcut, highcut, fs, order=5):
-        nyq = 0.5 * fs
-        low = lowcut / nyq
-        high = highcut / nyq
-        sos = butter(order, [low, high], analog=False, btype='band', output='sos')
-        return sos
-
-def butter_bandpass_filter(data, lowcut, highcut, fs, order=5):
-        sos = butter_bandpass(lowcut, highcut, fs, order=order)
-        y = sosfilt(sos, data)
-        return y
-
-plt.figure()
-t = out[0, :]-out[0, 0]
-plt.plot(t, out[1, :])
-plt.plot(t, butter_bandpass_filter(out[1, :], 30, 40, 10000))
-plt.show()
-
-
-
-#%%
 
 
 
 
-plt.figure()
-a, b = signal.periodogram(out[3,:], 1000)
-plt.semilogy(a, np.sqrt(b))
-plt.show()
+
+
+
+
+
 
 
 
