@@ -296,14 +296,18 @@ if __name__ == '__main__':
             # turn on AWG
             awg.set_ch_state(ch, state=True)
             time_.sleep(2)
-            # measure rms voltage from DMM
+            # measure rms voltage from DMM if freq >= 30, else directly query from AWG
             v_rms_list = []
-            DMM.write('F2')
-            j = 0
-            while j < 50:
-                ret = DMM.query("*TRG")
-                v_rms_list.append(float(ret[:-1]))
-                j += 1
+            if freq >= 30:
+                DMM.write('F2') # put DMM into AC voltage mode
+                j = 0
+                while j < 50:
+                    ret = DMM.query("*TRG")
+                    v_rms_list.append(float(ret[:-1]))
+                    j += 1
+            else:
+                ret = awg.get_vpp(ch)
+                v_rms_list.append(float(ret))
             # calculate average vrms measured and convert to vpp
             v_rms_meas = np.mean(v_rms_list)
             v_pp_meas = round(v_rms_meas * 2 * np.sqrt(2), 2)
