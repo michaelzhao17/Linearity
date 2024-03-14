@@ -8,6 +8,7 @@ import glob
 from scipy import signal
 from scipy import optimize
 from scipy.signal import butter, sosfilt, sosfreqz
+import time as time_
 #%% initalize dict for holding data to be save
 
 results = {'Voltage p2p (V)':[],
@@ -19,27 +20,27 @@ results = {'Voltage p2p (V)':[],
 # axis parallel to applied B
 axis = 'z'
 # driving frequency of applied B
-freq = 200 
+freq = 3
 # sampling frequency
 sr = 10000
 
 # bandpass
 bandpass = False
  
-def butter_bandpass(lowcut, highcut, fs, order=5):
+def butter_bandpass(lowcut, highcut, fs, order=3):
         nyq = 0.5 * fs
         low = lowcut / nyq
         high = highcut / nyq
         sos = butter(order, [low, high], analog=False, btype='band', output='sos')
         return sos
 
-def butter_bandpass_filter(data, lowcut, highcut, fs, order=5):
+def butter_bandpass_filter(data, lowcut, highcut, fs, order=3):
         sos = butter_bandpass(lowcut, highcut, fs, order=order)
         y = sosfilt(sos, data)
         return y
 
 
-for file in glob.glob('../data/mar13/zaxis_200Hz/*.csv'):
+for file in glob.glob('../data/mar13/zaxis_{}Hz/*.csv'.format(freq)):
     df = pd.read_csv(file)
     # Vin
     V = float(file[-22:-18]) 
@@ -50,7 +51,7 @@ for file in glob.glob('../data/mar13/zaxis_200Hz/*.csv'):
     # B along axis 
     B = df[axis].to_numpy()
     if bandpass:
-        B = butter_bandpass_filter(B, freq-5, freq+5, sr)[sr:]
+        B = butter_bandpass_filter(B, freq-1, freq+1, sr)[sr:]
     # find index of maximums and minimums
     max_idx = signal.find_peaks(B, distance=int(0.9*sr/freq))
     min_idx = signal.find_peaks(-B, distance=int(0.9*sr/freq))
@@ -67,7 +68,14 @@ for file in glob.glob('../data/mar13/zaxis_200Hz/*.csv'):
     maximas = B[max_idx[0]]
     minimas = B[min_idx[0]]
     extremas = np.asarray([val for pair in zip(maximas, minimas) for val in pair])
-
+    
+    plt.figure()
+    plt.plot(B)
+    plt.plot(max_idx[0], B[max_idx[0]], "x")
+    plt.plot(min_idx[0], B[min_idx[0]], "x")
+    plt.show()
+    
+    time_.sleep(10)
     # calculate peak to peak 
     pp = []
     for i in range(len(extremas)-1):
@@ -96,11 +104,13 @@ plt.show()
 def fitfunc(V, a, b):
     return a * V + b
 
+results = pd.read_csv('..//results//zaxis_003Hz.csv')
 popt, pcov = optimize.curve_fit(fitfunc, results['Voltage p2p (V)'][:10],
                        results['Magnetic Field p2p (nT)'][:10], sigma=results['Magnetic Uncertainty (nT)'][:10],
                        absolute_sigma=True)
 
 k = popt[0]
+print(k)
 Bin = np.multiply(k, results['Voltage p2p (V)'])
 Bmeas = results['Magnetic Field p2p (nT)']
 
@@ -121,39 +131,40 @@ plt.show()
 #%% save data
 results_df = pd.DataFrame(results)
 input('Sure you want to save? If not careful, WILL overwrite existing file')
-results_df.to_csv('../results/mar13_zaxis_200Hz.csv')
+results_df.to_csv('../results/zaxis_010Hz.csv')
 
 
 #%%
 # theory according to Biot Savart and Ohms law
 mu0 = 4 * np.pi * 1e-7
 res = 3.39e3
-voltages = np.linspace(0, 5, 100)
+voltages = np.linspace(0, 10, 100)
 rad = 85e-3
 Btheory = mu0 * (voltages / res) / 4 / rad * 1e9
 
+
+
+
 plt.figure()
 for file in glob.glob('..//results//*.csv'):
-    freq = file[24:27]
+    freq = file[18:21]
     df = pd.read_csv(file)
-    plt.errorbar(x=df['Voltage p2p (V)'], 
+    plt.errorbar(x=np.multiply(k, df['Voltage p2p (V)']), 
                  y=df['Magnetic Field p2p (nT)'], 
                  yerr=df['Magnetic Uncertainty (nT)'],
                  capsize=1,
                  fmt='o--',
                  markersize=2,
                  label='{} Hz'.format(freq))
-plt.plot(voltages, Btheory, 'k--', label='Biot Savart Law')
-plt.xlabel('Input Peak-to-Peak Voltage (V)')
+plt.plot(Bin, Bin, 'k--')
+#plt.plot(voltages, Btheory, 'k--', label='Biot Savart Law')
+plt.xlabel('Input Magnetic Peak-to-Peak Voltage (nT)')
 plt.ylabel('Measured Magnetic Peak-to-Peak Amplitude (nT)')
 plt.grid()
 plt.tight_layout()
 plt.legend()
 #plt.gca().set_aspect("equal")
 plt.show()
-
-
-
 
 
 

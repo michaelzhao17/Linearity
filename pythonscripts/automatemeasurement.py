@@ -221,14 +221,17 @@ def labjack_measure(measurement_length, scanRate, aScanListNames, convfactors=No
 #%% initial configuration
 # AWG settings
 ch = 1
-freq = 200
+freq = 3
 offset = 0
 vpp = 1
 waveform = 'SIN'
-res = 2030
-cap = 8.67e-6
-imp = np.sqrt(res**2+1/(2*np.pi*freq*cap)**2)
-
+hp = True
+if hp:
+    res = 2030
+    cap = 8.67e-6
+    imp = np.sqrt(res**2+1/(2*np.pi*freq*cap)**2)
+if not hp:
+    imp = 3390
 awg.set_impedance(ch, imp)
 awg.set_wave(ch, waveform, freq, vpp, offset, phase=0)
 
@@ -241,7 +244,7 @@ gain_dict = {'0.1x':0.27,
              '3x':8.1}
 q.set_gain(gain)
 zero_t = 10
-t = 3 # number of seconds to record
+t = 2 # number of seconds to record
 axis = 'z' # axis being measured
 
 # save file settings
@@ -274,9 +277,9 @@ def make_folder(fp, axis, freq):
 #%% main script
 if __name__ == '__main__':
     # iterate over frequencies
-    for freq in [20,  80, 400]:
+    for freq in [400]:
         # iterable of Vpp values to output
-        vpps = np.linspace(0.1, 10, 99)
+        vpps = np.linspace(0.1, 10, 49, endpoint=False)
         i = 0
         progress = tqdm(leave=False, total=99, desc='Experiment Running')
         # make folder and get folder name 
@@ -296,28 +299,37 @@ if __name__ == '__main__':
             # turn on AWG
             awg.set_ch_state(ch, state=True)
             time_.sleep(2)
-            # measure rms voltage from DMM if freq >= 30, else directly query from AWG
-            v_rms_list = []
+            # measure rms voltage from DMM if freq >= 30, else directly pp query from AWG            
             if freq >= 30:
+                v_rms_list = []
+                instr = 'DMM'
                 DMM.write('F2') # put DMM into AC voltage mode
                 j = 0
                 while j < 50:
                     ret = DMM.query("*TRG")
                     v_rms_list.append(float(ret[:-1]))
                     j += 1
+                # calculate average vrms measured and convert to vpp
+                v_rms_meas = np.mean(v_rms_list)
+                v_pp_meas = round(v_rms_meas * 2 * np.sqrt(2), 2)
+                strV = str(v_pp_meas)
+                print('DMM measures {} Vpp'.format(strV))
+                if len(strV) == 4:
+                    pass
+                else:
+                    strV = strV + '0'
             else:
-                ret = awg.get_vpp(ch)
-                v_rms_list.append(float(ret))
-            # calculate average vrms measured and convert to vpp
-            v_rms_meas = np.mean(v_rms_list)
-            v_pp_meas = round(v_rms_meas * 2 * np.sqrt(2), 2)
-            strV = str(v_pp_meas)
-            print('DMM measures {} Vpp'.format(strV))
-            if len(strV) == 4:
-                pass
-            else:
-                strV = strV + '0'
                 
+                instr = 'AWG'
+                ret = awg.get_vpp(ch)
+                v_pp_meas = round(float(ret), 2)
+                strV = str(v_pp_meas)
+                print('AWG measures {} Vpp'.format(v_pp_meas))
+                if len(strV) == 4:
+                    pass
+                else:
+                    strV = strV + '0'
+
             # labjack measure
             out = labjack_measure(t, 10000, ["AIN2"], [gain_dict[gain]], [10.0])
             
