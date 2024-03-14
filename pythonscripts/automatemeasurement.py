@@ -19,17 +19,23 @@ from scipy.signal import butter, lfilter
 import pyvisa 
 from SiglentDevices import DG1032Z
 import pathlib
+from DMM6500 import DMM6500
+from DMM6500_SCPI import Function
 #%% initialize instruments as objects
 rm = pyvisa.ResourceManager()
 #print(rm.list_resources())
 
 # Digital Multimeter
-DMM = rm.open_resource('USB0::0x1334::0x0204::262800066::INSTR')
+DMM = rm.open_resource('USB0::0x05E6::0x6500::04550534::INSTR')
 DMM.read_termination = '\n'
 DMM.write_termination = '\n'
 DMM.query('*IDN?')
+mm = DMM6500(DMM)
+mm.function = Function.AC_VOLTAGE
 
-# Digital Oscilloscope
+
+
+# Digital Function Generator
 awg = DG1032Z(hostname='USB0::0x1AB1::0x0642::DG1ZA232603182::INSTR')
 awg.query('*IDN?')
 
@@ -245,11 +251,14 @@ def make_folder(fp, axis, freq):
 #%% initial configuration
 # AWG settings
 ch = 1
-freq = 3
+freq = 35
 offset = 0
 vpp = 1
 waveform = 'SIN'
 hp = True
+
+# circuit setting
+r = 3390 # resistance value of r2 (the one NOT apart of highpass)
 
 # QZFM settings
 gain = '0.33x' # possible gains are 0.1x|0.33x|1x|3x
@@ -274,13 +283,15 @@ ljch = {'x':'AIN0',
 #%% main script
 if __name__ == '__main__':
     # iterate over frequencies
-    for freq in [75, 100, 200, 400]:
+    for freq in [35]:
         if hp:
-            res = 2030
+            r1 = 5062
+            r2 = r
+            res = 1/ (1/r1 + 1/r2)
             cap = 8.67e-6
             imp = np.sqrt(res**2+1/(2*np.pi*freq*cap)**2)
         if not hp:
-            imp = 3390
+            imp = r
         awg.set_impedance(ch, imp)
         awg.set_wave(ch, waveform, freq, vpp, offset, phase=0)
         # iterable of Vpp values to output
@@ -304,36 +315,24 @@ if __name__ == '__main__':
             # turn on AWG
             awg.set_ch_state(ch, state=True)
             time_.sleep(2)
-            # measure rms voltage from DMM if freq >= 30, else directly pp query from AWG            
-            if freq >= 30:
-                v_rms_list = []
-                instr = 'DMM'
-                DMM.write('F2') # put DMM into AC voltage mode
-                j = 0
-                while j < 50:
-                    ret = DMM.query("*TRG")
-                    v_rms_list.append(float(ret[:-1]))
-                    j += 1
-                # calculate average vrms measured and convert to vpp
-                v_rms_meas = np.mean(v_rms_list)
-                v_pp_meas = round(v_rms_meas * 2 * np.sqrt(2), 2)
-                strV = str(v_pp_meas)
-                print('DMM measures {} Vpp'.format(strV))
-                if len(strV) == 4:
-                    pass
-                else:
-                    strV = strV + '0'
+            # measure rms voltage from DMM            
+            v_rms_list = []
+            instr = 'DMM'
+            j = 0
+            while j < 50:
+                ret = mm.measure()
+                v_rms_list.append(ret)
+                j += 1
+            # calculate average vrms measured and convert to vpp
+            v_rms_meas = np.mean(v_rms_list)
+            v_pp_meas = round(v_rms_meas * 2 * np.sqrt(2), 2)
+            strV = str(v_pp_meas)
+            print('DMM measures {} Vpp'.format(strV))
+            if len(strV) == 4:
+                pass
             else:
-                
-                instr = 'AWG'
-                ret = awg.get_vpp(ch)
-                v_pp_meas = round(float(ret), 2)
-                strV = str(v_pp_meas)
-                print('AWG measures {} Vpp'.format(v_pp_meas))
-                if len(strV) == 4:
-                    pass
-                else:
-                    strV = strV + '0'
+                strV = strV + '0'
+          
 
             # labjack measure
             out = labjack_measure(t, 10000, [ljch[axis]], [gain_dict[gain]], [10.0])
