@@ -41,10 +41,13 @@ Mar 13th
 - change analysis code to be curve fit quadratic
 
 Mar 14th
-- take off MSR door, install y coil
+- take off MSR door, install y coil (done)
 - clean x coil (done)
-- put wire on x coil
+- put wire on x coil (done)
 - measure freq 3, 10 without highpass
-- measure 50, 100, 200 with highpass
-
+- measure 35, 50, 100, 200 with highpass
+-> big problem, the amplitude in y seems to consistently higher
+- install x coil
+- measure 35, 50, 200 with highpass for x 
+- lab report
 

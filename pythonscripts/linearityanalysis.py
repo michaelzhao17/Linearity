@@ -18,9 +18,9 @@ results = {'Voltage p2p (V)':[],
 #%% read data and find peak to peak with simple peak finding method
 
 # axis parallel to applied B
-axis = 'z'
+axis = 'x'
 # driving frequency of applied B
-freq = 3
+freq = 35
 # sampling frequency
 sr = 10000
 
@@ -40,7 +40,7 @@ def butter_bandpass_filter(data, lowcut, highcut, fs, order=3):
         return y
 
 
-for file in glob.glob('../data/mar13/zaxis_{}Hz/*.csv'.format(freq)):
+for file in glob.glob('../data/mar14/{}axis_{}Hz/*.csv'.format(axis, freq)):
     df = pd.read_csv(file)
     # Vin
     V = float(file[-22:-18]) 
@@ -69,20 +69,25 @@ for file in glob.glob('../data/mar13/zaxis_{}Hz/*.csv'.format(freq)):
     minimas = B[min_idx[0]]
     extremas = np.asarray([val for pair in zip(maximas, minimas) for val in pair])
     
-    plt.figure()
-    plt.plot(B)
-    plt.plot(max_idx[0], B[max_idx[0]], "x")
-    plt.plot(min_idx[0], B[min_idx[0]], "x")
-    plt.show()
+    # plt.figure()
+    # plt.plot(B)
+    # plt.plot(max_idx[0], B[max_idx[0]], "x")
+    # plt.plot(min_idx[0], B[min_idx[0]], "x")
+    # plt.show()
     
-    time_.sleep(10)
+    # time_.sleep(10)
     # calculate peak to peak 
     pp = []
     for i in range(len(extremas)-1):
         pp.append(abs(extremas[i]-extremas[i+1]))
     results['Magnetic Field p2p (nT)'].append(np.mean(pp))
     results['Magnetic Uncertainty (nT)'].append(np.std(pp))
-    
+
+#%% save data
+results_df = pd.DataFrame(results)
+input('Sure you want to save? If not careful, WILL overwrite existing file')
+results_df.to_csv('../results/yaxis_200Hz.csv')
+
 #%%
 plt.figure()
 plt.errorbar(x=results['Voltage p2p (V)'], 
@@ -104,7 +109,15 @@ plt.show()
 def fitfunc(V, a, b):
     return a * V + b
 
-results = pd.read_csv('..//results//zaxis_003Hz.csv')
+# function to get convert factor from input voltage axis to input magnetic field 
+def conv_factor_v2b(df):
+    popt, pcov = optimize.curve_fit(fitfunc, df['Voltage p2p (V)'][:10],
+                           df['Magnetic Field p2p (nT)'][:10], sigma=df['Magnetic Uncertainty (nT)'][:10],
+                           absolute_sigma=True)
+    return popt[0]
+
+#%%
+results = pd.read_csv('..//results//yaxis_035Hz.csv')
 popt, pcov = optimize.curve_fit(fitfunc, results['Voltage p2p (V)'][:10],
                        results['Magnetic Field p2p (nT)'][:10], sigma=results['Magnetic Uncertainty (nT)'][:10],
                        absolute_sigma=True)
@@ -118,7 +131,7 @@ Bmeas = results['Magnetic Field p2p (nT)']
 
 plt.figure()
 plt.errorbar(Bin, Bmeas, results['Magnetic Uncertainty (nT)'],
-             capsize=5,
+             capsize=1,
              fmt='o--',
              markersize=2)
 plt.plot(Bin, Bin, 'k--')
@@ -128,10 +141,6 @@ plt.grid()
 plt.show()
 
 
-#%% save data
-results_df = pd.DataFrame(results)
-input('Sure you want to save? If not careful, WILL overwrite existing file')
-results_df.to_csv('../results/zaxis_010Hz.csv')
 
 
 #%%
@@ -143,21 +152,19 @@ rad = 85e-3
 Btheory = mu0 * (voltages / res) / 4 / rad * 1e9
 
 
-
-
 plt.figure()
-for file in glob.glob('..//results//*.csv'):
+for file in glob.glob('..//results//*200Hz*.csv'):
     freq = file[18:21]
     df = pd.read_csv(file)
-    plt.errorbar(x=np.multiply(k, df['Voltage p2p (V)']), 
+    plt.errorbar(x=np.multiply(df['Voltage p2p (V)'], conv_factor_v2b(df)), 
                  y=df['Magnetic Field p2p (nT)'], 
                  yerr=df['Magnetic Uncertainty (nT)'],
                  capsize=1,
                  fmt='o--',
                  markersize=2,
                  label='{} Hz'.format(freq))
-plt.plot(Bin, Bin, 'k--')
-#plt.plot(voltages, Btheory, 'k--', label='Biot Savart Law')
+# plt.plot(Bin, Bin, 'k--')
+plt.plot(voltages, Btheory, 'k--', label='Biot Savart Law')
 plt.xlabel('Input Magnetic Peak-to-Peak Voltage (nT)')
 plt.ylabel('Measured Magnetic Peak-to-Peak Amplitude (nT)')
 plt.grid()
@@ -166,8 +173,12 @@ plt.legend()
 #plt.gca().set_aspect("equal")
 plt.show()
 
-
-
-
-
+#%% compare amplitude between axis for same input voltage
+dfx = pd.read_csv('..//data//mar14//xaxis_35Hz//0.70-240314T121701.csv')
+dfz = pd.read_csv('..//data//mar12//zaxis_35Hz//0.70-240312T154016.csv')
+plt.figure()
+plt.plot(dfx['x'], label='x')
+plt.plot(dfz['z'], label='z')
+plt.legend()
+plt.show()
 

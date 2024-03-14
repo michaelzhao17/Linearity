@@ -218,38 +218,6 @@ def labjack_measure(measurement_length, scanRate, aScanListNames, convfactors=No
     ljm.close(handle)
 
     return output_ar 
-#%% initial configuration
-# AWG settings
-ch = 1
-freq = 3
-offset = 0
-vpp = 1
-waveform = 'SIN'
-hp = True
-if hp:
-    res = 2030
-    cap = 8.67e-6
-    imp = np.sqrt(res**2+1/(2*np.pi*freq*cap)**2)
-if not hp:
-    imp = 3390
-awg.set_impedance(ch, imp)
-awg.set_wave(ch, waveform, freq, vpp, offset, phase=0)
-
-# QZFM settings
-gain = '0.33x' # possible gains are 0.1x|0.33x|1x|3x
-# corresponding conversion V/nT for each gain
-gain_dict = {'0.1x':0.27,
-             '0.33x':0.9,
-             '1x':2.7,
-             '3x':8.1}
-q.set_gain(gain)
-zero_t = 10
-t = 2 # number of seconds to record
-axis = 'z' # axis being measured
-
-# save file settings
-save = True # save as csv if True
-fp = '..//data//mar13//'
 #%% auto folder creation function
 def make_folder(fp, axis, freq):
     '''
@@ -274,16 +242,53 @@ def make_folder(fp, axis, freq):
     pathlib.Path(fp+folder_name).mkdir(parents=True, exist_ok=True) 
     return folder_name
 
+#%% initial configuration
+# AWG settings
+ch = 1
+freq = 3
+offset = 0
+vpp = 1
+waveform = 'SIN'
+hp = True
+
+# QZFM settings
+gain = '0.33x' # possible gains are 0.1x|0.33x|1x|3x
+# corresponding conversion V/nT for each gain
+gain_dict = {'0.1x':0.27,
+             '0.33x':0.9,
+             '1x':2.7,
+             '3x':8.1}
+q.set_gain(gain)
+zero_t = 10
+t = 2 # number of seconds to record
+axis = 'x' # axis being measured
+
+# save file settings
+save = True # save as csv if True
+fp = '..//data//mar14//'
+
+# dictionary of axis and corresponding labjack channel
+ljch = {'x':'AIN0',
+        'y':'AIN1',
+        'z':'AIN2'}
 #%% main script
 if __name__ == '__main__':
     # iterate over frequencies
-    for freq in [400]:
+    for freq in [75, 100, 200, 400]:
+        if hp:
+            res = 2030
+            cap = 8.67e-6
+            imp = np.sqrt(res**2+1/(2*np.pi*freq*cap)**2)
+        if not hp:
+            imp = 3390
+        awg.set_impedance(ch, imp)
+        awg.set_wave(ch, waveform, freq, vpp, offset, phase=0)
         # iterable of Vpp values to output
         vpps = np.linspace(0.1, 10, 49, endpoint=False)
         i = 0
         progress = tqdm(leave=False, total=99, desc='Experiment Running')
         # make folder and get folder name 
-        folder_name = make_folder('..//data//mar13//', axis, freq)
+        folder_name = make_folder(fp, axis, freq)
         
         for idx, vpp in enumerate(vpps):
             i_start = i
@@ -331,13 +336,13 @@ if __name__ == '__main__':
                     strV = strV + '0'
 
             # labjack measure
-            out = labjack_measure(t, 10000, ["AIN2"], [gain_dict[gain]], [10.0])
+            out = labjack_measure(t, 10000, [ljch[axis]], [gain_dict[gain]], [10.0])
             
             # turn off AWG
             awg.set_ch_state(ch, state=False)
             # save data
             out_df = pd.DataFrame(out.T)
-            out_df.columns = ['Epoch Time', 'z']
+            out_df.columns = ['Epoch Time', axis]
             out_df.set_index("Epoch Time", inplace=True)
             if save:
                 current_time = datetime.now().strftime('%y%m%dT%H%M%S')
@@ -348,10 +353,7 @@ if __name__ == '__main__':
     
 
 
-
-
-
-
+#%%
 
 
 

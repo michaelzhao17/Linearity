@@ -19,7 +19,7 @@ results = {'Voltage p2p (V)':[],
 # axis parallel to applied B
 axis = 'z'
 # driving frequency of applied B
-freq = 10
+freq = 35
 # sampling frequency
 sr = 10000
 def quad(x, a, b, c):
