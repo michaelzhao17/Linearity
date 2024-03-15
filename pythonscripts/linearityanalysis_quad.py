@@ -76,15 +76,14 @@ for file in glob.glob('../data/mar14/{}axis_{}Hz/*.csv'.format(axis, freq)):
                 y = B[int(idx-period//4):int(idx+period//4)]
                 x = np.arange(len(y))
                 p = np.polyfit(x, y, 4)
+                yn = np.poly1d(p)
                 
-                # popt, pcov = optimize.curve_fit(quad_fit, x),
-                #                        segment)
                 # plt.figure()
                 # plt.plot(x, y)
-                yn = np.poly1d(p)
                 # plt.plot(x, yn(x))
                 # plt.show()
-                # time_.sleep(0.1)
+                # time_.sleep(0.2)
+                
                 #print(max(yn(x)))
                 maximas.append(max(yn(x)))
             except IndexError:
@@ -95,17 +94,14 @@ for file in glob.glob('../data/mar14/{}axis_{}Hz/*.csv'.format(axis, freq)):
                 y = B[int(idx-period//4):int(idx+period//4)]
                 x = np.arange(len(y))
                 p = np.polyfit(x, y, 4)
-                
-                # popt, pcov = optimize.curve_fit(quad_fit, x),
-                #                        segment)
-                # plt.figure()
-                # plt.plot(np.arange(len(segment)),
-                #                         segment)
-                # plt.plot(np.arange(len(segment)), quad_fit(np.arange(len(segment)), *popt))
-                # plt.show()
-                # # time_.sleep(5)
-                #print(p[-1])
                 yn = np.poly1d(p)
+                
+                # plt.figure()
+                # plt.plot(x, y)
+                # plt.plot(x, yn(x))
+                # plt.show()
+                # time_.sleep(0.2)
+                
                 minimas.append(min(yn(x)))
             except IndexError:
                 continue
@@ -208,8 +204,8 @@ for file in glob.glob('..//results//xaxis*035Hz*.csv'):
                  fmt='o--',
                  markersize=2,
                  label='{} Hz'.format(freq))
-# plt.plot(Bin, Bin, 'k--')
-plt.plot(voltages, Btheory, 'k--', label='Biot Savart Law')
+plt.plot(np.multiply(df['Voltage p2p (V)'], conv_factor_v2b(df)), np.multiply(df['Voltage p2p (V)'], conv_factor_v2b(df)), 'k--')
+#plt.plot(voltages, Btheory, 'k--', label='Biot Savart Law')
 plt.xlabel('Input Magnetic Peak-to-Peak Voltage (nT)')
 plt.ylabel('Measured Magnetic Peak-to-Peak Amplitude (nT)')
 plt.grid()
