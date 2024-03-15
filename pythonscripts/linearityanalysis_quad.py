@@ -1,5 +1,5 @@
-# # mar 2024
-# linearity data analysis with quadratic curvefit 
+# mar 2024
+# linearity data analysis
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -8,6 +8,7 @@ import glob
 from scipy import signal
 from scipy import optimize
 from scipy.signal import butter, sosfilt, sosfreqz
+import time as time_
 #%% initalize dict for holding data to be save
 
 results = {'Voltage p2p (V)':[],
@@ -17,15 +18,31 @@ results = {'Voltage p2p (V)':[],
 #%% read data and find peak to peak with simple peak finding method
 
 # axis parallel to applied B
-axis = 'z'
+axis = 'x'
 # driving frequency of applied B
 freq = 35
 # sampling frequency
 sr = 10000
-def quad(x, a, b, c):
+
+# bandpass
+bandpass = False
+ 
+def butter_bandpass(lowcut, highcut, fs, order=1):
+        nyq = 0.5 * fs
+        low = lowcut / nyq
+        high = highcut / nyq
+        sos = butter(order, [low, high], analog=False, btype='band', output='sos')
+        return sos
+
+def butter_bandpass_filter(data, lowcut, highcut, fs, order=1):
+        sos = butter_bandpass(lowcut, highcut, fs, order=order)
+        y = sosfilt(sos, data)
+        return y
+    
+def quad_fit(x, a, b, c):
     return a*x**2 + b*x + c
 
-for file in glob.glob('../data/mar13/zaxis_10Hz/*.csv'):
+for file in glob.glob('../data/mar14/{}axis_{}Hz/*.csv'.format(axis, freq)):
     df = pd.read_csv(file)
     # Vin
     V = float(file[-22:-18]) 
@@ -35,88 +52,87 @@ for file in glob.glob('../data/mar13/zaxis_10Hz/*.csv'):
     t = df['Epoch Time'] - df['Epoch Time'].iloc[0]
     # B along axis 
     B = df[axis].to_numpy()
+    if bandpass:
+        B = butter_bandpass_filter(B, freq-1, freq+1, sr)[sr:]
     # find index of maximums and minimums
     max_idx = signal.find_peaks(B, distance=int(0.9*sr/freq))
     min_idx = signal.find_peaks(-B, distance=int(0.9*sr/freq))
-
-    # calculate number of samples for 1/8 of period
-    period = sr/freq # period in samples
+    
+    # ensure both arrays have same number of elements
+    if len(max_idx) == len(min_idx):
+        pass
+    elif len(max_idx) == len(min_idx) + 1:
+        max_idx = max_idx[:-1]
+    elif len(max_idx) == len(min_idx) - 1:
+        min_idx = min_idx[:-1]
+    
+    period = sr / freq
     
     maximas = []
     minimas = []
-    # iterate through maxima and minima indexes, fit quadratic 
     for idx in max_idx[0]:
-        if idx-int(period/8) < 0:
-            segment = B[:idx+int(period/8)]
-        else:
-            segment = B[idx-int(period/8):idx+int(period/8)]
-        x = np.linspace(0, 1, len(segment))
-        fit_ok = False
-        itr = 0
-        last_init_guess = (0.01, 0.6, 1, 0.75)
-        while not fit_ok:
-            if itr == 0:
-                p0 = (1, 1, 1)
-                popt, pcov = optimize.curve_fit(quad, x, segment, p0=p0, maxfev=2000)
-                # show fit result
-                plt.figure(figsize=(6.4*1.5, 4.8*1.5))
-                plt.plot(x, segment, label="Raw")
-                plt.plot(x, quad(x, *popt), 'r--',
-                         label=r'fit: a=%5.3f, b=%5.3f, c=%5.3f' % tuple(popt))
-                plt.ylim(np.min(segment), np.max(segment))
-                plt.legend() 
-                plt.pause(0.1)
-                plt.show()
-                print('Currently on {}'.format(file))
-                fit_ok = input('Fit is OK? T or F)\n')
-                if fit_ok == 'T' or fit_ok == 't':
-                    fit_ok = True
-                else:
-                    fit_ok = False
-                plt.close()
-                itr += 1
+        if idx > period // 4:
+            try:
+                y = B[int(idx-period//4):int(idx+period//4)]
+                x = np.arange(len(y))
+                p = np.polyfit(x, y, 4)
+                
+                # popt, pcov = optimize.curve_fit(quad_fit, x),
+                #                        segment)
+                # plt.figure()
+                # plt.plot(x, y)
+                yn = np.poly1d(p)
+                # plt.plot(x, yn(x))
+                # plt.show()
+                # time_.sleep(0.1)
+                #print(max(yn(x)))
+                maximas.append(max(yn(x)))
+            except IndexError:
                 continue
-            else:
-                p0 = (1, 1, 1)
-                popt, pcov = optimize.curve_fit(quad, x, segment, p0=p0, maxfev=2000)
-                # show fit result
-                plt.figure(figsize=(6.4*1.5, 4.8*1.5))
-                plt.plot(x, segment, label="Raw")
-                plt.plot(x, quad(x, *popt), 'r--',
-                     label=r'fit: a=%5.3f, b=%5.3f, c=%5.3f' % tuple(popt))
-                plt.ylim(np.min(segment), np.max(segment))
-                plt.legend() 
-                plt.pause(0.1)
-                plt.show()
-                print('Currently on {}'.format(file))
-                fit_ok = 't' #input('Fit is OK? T or F)\n')
-                if fit_ok == 'T' or fit_ok == 't':
-                    fit_ok = True
-                else:
-                    fit_ok = False
-                plt.close()
-                last_init_guess = p0
-                continue
-        maximas.append(popt[2])
     for idx in min_idx[0]:
-        if idx-int(period/8) < 0:
-            segment = B[:idx+int(period/8)]
-            x = np.linspace(0, 1, len(segment))
-            popt, pcov = optimize.curve_fit(quad, x, segment)
-        else:
-            segment = B[idx-int(period/8):idx+int(period/8)]
-            x = np.linspace(0, 1, len(segment))
-            popt, pcov = optimize.curve_fit(quad, x, segment)
-        minimas.append(popt[2])
+        if idx > period // 4:
+            try:
+                y = B[int(idx-period//4):int(idx+period//4)]
+                x = np.arange(len(y))
+                p = np.polyfit(x, y, 4)
+                
+                # popt, pcov = optimize.curve_fit(quad_fit, x),
+                #                        segment)
+                # plt.figure()
+                # plt.plot(np.arange(len(segment)),
+                #                         segment)
+                # plt.plot(np.arange(len(segment)), quad_fit(np.arange(len(segment)), *popt))
+                # plt.show()
+                # # time_.sleep(5)
+                #print(p[-1])
+                yn = np.poly1d(p)
+                minimas.append(min(yn(x)))
+            except IndexError:
+                continue
     # get interweaved peak values
+    # maximas = B[max_idx[0]]
+    # minimas = B[min_idx[0]]
     extremas = np.asarray([val for pair in zip(maximas, minimas) for val in pair])
+  
+    # plt.figure()
+    # plt.plot(B)
+    # plt.plot(max_idx[0], B[max_idx[0]], "x")
+    # plt.plot(min_idx[0], B[min_idx[0]], "x")
+    # plt.show()
+    
+    #time_.sleep(4)
     # calculate peak to peak 
     pp = []
     for i in range(len(extremas)-1):
         pp.append(abs(extremas[i]-extremas[i+1]))
     results['Magnetic Field p2p (nT)'].append(np.mean(pp))
     results['Magnetic Uncertainty (nT)'].append(np.std(pp))
-    
+
+#%% save data
+results_df = pd.DataFrame(results)
+input('Sure you want to save? If not careful, WILL overwrite existing file')
+results_df.to_csv('../results/xaxis_035Hz_quadfit.csv')
+
 #%%
 plt.figure()
 plt.errorbar(x=results['Voltage p2p (V)'], 
@@ -132,20 +148,82 @@ plt.tight_layout()
 #plt.gca().set_aspect("equal")
 plt.show()
 
+#%% curve fit to determine proportionality constant k between input voltage and input B
+
+# fitting function
+def fitfunc(V, a, b):
+    return a * V + b
+
+# function to get convert factor from input voltage axis to input magnetic field 
+def conv_factor_v2b(df):
+    popt, pcov = optimize.curve_fit(fitfunc, df['Voltage p2p (V)'][:10],
+                           df['Magnetic Field p2p (nT)'][:10], sigma=df['Magnetic Uncertainty (nT)'][:10],
+                           absolute_sigma=True)
+    return popt[0]
+
+#%%
+results = pd.read_csv('..//results//yaxis_035Hz.csv')
+popt, pcov = optimize.curve_fit(fitfunc, results['Voltage p2p (V)'][:10],
+                       results['Magnetic Field p2p (nT)'][:10], sigma=results['Magnetic Uncertainty (nT)'][:10],
+                       absolute_sigma=True)
+
+k = popt[0]
+print(k)
+Bin = np.multiply(k, results['Voltage p2p (V)'])
+Bmeas = results['Magnetic Field p2p (nT)']
+
+
+
+plt.figure()
+plt.errorbar(Bin, Bmeas, results['Magnetic Uncertainty (nT)'],
+             capsize=1,
+             fmt='o--',
+             markersize=2)
+plt.plot(Bin, Bin, 'k--')
+plt.xlabel('162 Hz Reference Magnetic Field [nT peak-to-peak]')
+plt.ylabel('162 Hz Measured Magnetic Field [nT peak-to-peak]')
+plt.grid()
+plt.show()
 
 
 
 
+#%%
+# theory according to Biot Savart and Ohms law
+mu0 = 4 * np.pi * 1e-7
+res = 3.39e3
+voltages = np.linspace(0, 10, 100)
+rad = 85e-3
+Btheory = mu0 * (voltages / res) / 4 / rad * 1e9
 
 
+plt.figure()
+for file in glob.glob('..//results//xaxis*035Hz*.csv'):
+    freq = file[18:21]
+    df = pd.read_csv(file)
+    plt.errorbar(x=np.multiply(df['Voltage p2p (V)'], conv_factor_v2b(df)), 
+                 y=df['Magnetic Field p2p (nT)'], 
+                 yerr=df['Magnetic Uncertainty (nT)'],
+                 capsize=1,
+                 fmt='o--',
+                 markersize=2,
+                 label='{} Hz'.format(freq))
+# plt.plot(Bin, Bin, 'k--')
+plt.plot(voltages, Btheory, 'k--', label='Biot Savart Law')
+plt.xlabel('Input Magnetic Peak-to-Peak Voltage (nT)')
+plt.ylabel('Measured Magnetic Peak-to-Peak Amplitude (nT)')
+plt.grid()
+plt.tight_layout()
+plt.legend()
+#plt.gca().set_aspect("equal")
+plt.show()
 
-
-
-
-
-
-
-
-
-
+#%% compare amplitude between axis for same input voltage
+dfx = pd.read_csv('..//data//mar14//xaxis_35Hz//0.70-240314T121701.csv')
+dfz = pd.read_csv('..//data//mar12//zaxis_35Hz//0.70-240312T154016.csv')
+plt.figure()
+plt.plot(dfx['x'], label='x')
+plt.plot(dfz['z'], label='z')
+plt.legend()
+plt.show()
 
