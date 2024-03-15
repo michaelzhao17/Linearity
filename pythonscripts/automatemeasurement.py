@@ -251,7 +251,7 @@ def make_folder(fp, axis, freq):
 #%% initial configuration
 # AWG settings
 ch = 1
-freq = 40
+freq = 35
 offset = 0
 vpp = 1
 waveform = 'SIN'
@@ -270,7 +270,7 @@ gain_dict = {'0.1x':0.27,
 # q.set_gain(gain)
 zero_t = 8
 t = 5 # number of seconds to record
-axis = 'x' # axis being measured
+axis = 'y' # axis being measured
 
 # save file settings
 save = True # save as csv if True
@@ -295,7 +295,7 @@ if __name__ == '__main__':
         awg.set_impedance(ch, imp)
         awg.set_wave(ch, waveform, freq, vpp, offset, phase=0)
         # iterable of Vpp values to output
-        vpps = np.linspace(3.5, 16, 78, endpoint=False)
+        vpps = np.linspace(0.1, 2, 50, endpoint=False)
         i = 0
         progress = tqdm(leave=False, total=99, desc='Experiment Running')
         # make folder and get folder name 
@@ -319,7 +319,7 @@ if __name__ == '__main__':
             v_rms_list = []
             instr = 'DMM'
             j = 0
-            while j < 25:
+            while j < 10:
                 ret = mm.measure()
                 v_rms_list.append(ret)
                 j += 1

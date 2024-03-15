@@ -18,7 +18,7 @@ results = {'Voltage p2p (V)':[],
 #%% read data and find peak to peak with simple peak finding method
 
 # axis parallel to applied B
-axis = 'x'
+axis = 'y'
 # driving frequency of applied B
 freq = 35
 # sampling frequency
@@ -88,7 +88,7 @@ for file in glob.glob('../data/mar15/{}axis_{}Hz/*.csv'.format(axis, freq)):
 #%% save data
 results_df = pd.DataFrame(results)
 input('Sure you want to save? If not careful, WILL overwrite existing file')
-results_df.to_csv('../results/xaxis_035Hz_final.csv')
+results_df.to_csv('../results/yaxis_035Hz_test.csv')
 
 #%%
 plt.figure()
@@ -143,18 +143,18 @@ Btheory = mu0 * (voltages / res) / 4 / rad * 1e9
 
 
 plt.figure()
-for file in glob.glob('..//results//yaxis*035Hz*.csv'):
+for file in glob.glob('..//results//*035Hz*final*quad*.csv'):
     freq = file[18:21]
     df = pd.read_csv(file)
     plt.errorbar(x=np.multiply(df['Voltage p2p (V)'], conv_factor_v2b(df)), 
                  y=df['Magnetic Field p2p (nT)'], 
                  yerr=df['Magnetic Uncertainty (nT)'],
                  capsize=1,
-                 fmt='o--',
+                 fmt='o',
                  markersize=2,
                  label='{} Hz'.format(freq))
 # plt.plot(Bin, Bin, 'k--')
-plt.plot(voltages, Btheory, 'k--', label='Biot Savart Law')
+#plt.plot(voltages, Btheory, 'k--', label='Biot Savart Law')
 plt.xlabel('Input Magnetic Peak-to-Peak Amplitude (nT)')
 plt.ylabel('Measured Magnetic Peak-to-Peak Amplitude (nT)')
 plt.grid()
