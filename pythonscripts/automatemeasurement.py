@@ -251,7 +251,7 @@ def make_folder(fp, axis, freq):
 #%% initial configuration
 # AWG settings
 ch = 1
-freq = 35
+freq = 40
 offset = 0
 vpp = 1
 waveform = 'SIN'
@@ -267,14 +267,14 @@ gain_dict = {'0.1x':0.27,
              '0.33x':0.9,
              '1x':2.7,
              '3x':8.1}
-q.set_gain(gain)
-zero_t = 10
-t = 2 # number of seconds to record
+# q.set_gain(gain)
+zero_t = 8
+t = 5 # number of seconds to record
 axis = 'x' # axis being measured
 
 # save file settings
 save = True # save as csv if True
-fp = '..//data//mar14//'
+fp = '..//data//mar15//'
 
 # dictionary of axis and corresponding labjack channel
 ljch = {'x':'AIN0',
@@ -295,7 +295,7 @@ if __name__ == '__main__':
         awg.set_impedance(ch, imp)
         awg.set_wave(ch, waveform, freq, vpp, offset, phase=0)
         # iterable of Vpp values to output
-        vpps = np.linspace(0.1, 10, 49, endpoint=False)
+        vpps = np.linspace(3.5, 16, 78, endpoint=False)
         i = 0
         progress = tqdm(leave=False, total=99, desc='Experiment Running')
         # make folder and get folder name 
@@ -319,7 +319,7 @@ if __name__ == '__main__':
             v_rms_list = []
             instr = 'DMM'
             j = 0
-            while j < 50:
+            while j < 25:
                 ret = mm.measure()
                 v_rms_list.append(ret)
                 j += 1
@@ -353,9 +353,20 @@ if __name__ == '__main__':
 
 
 #%%
+# zero 
+q.field_zero(True, show=False)
+# sleep 10 seconds
+for i in range(zero_t):
+    time_.sleep(1)
+q.field_zero(False)
 
-
-
-
+input('turn on')
+out = labjack_measure(t, 10000, [ljch[axis]], [gain_dict[gain]], [10.0])
+#%%
+df_old= pd.read_csv('..//data//mar14//xaxis_35Hz//9.48-240314T130111.csv')
+plt.figure()
+plt.plot(df_old['x'])
+plt.plot(out[1, :])
+plt.show()
 
 

@@ -51,3 +51,7 @@ Mar 14th
 - measure 35, 50, 200 with highpass for x 
 - lab report
 
+Mar 15th
+3 measurements, really detailed, at 40 Hz, 100 data points per, 4 seconds of quspin reading per
+
+
