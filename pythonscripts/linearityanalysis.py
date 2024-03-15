@@ -143,7 +143,7 @@ Btheory = mu0 * (voltages / res) / 4 / rad * 1e9
 
 
 plt.figure()
-for file in glob.glob('..//results//xaxis*035Hz*.csv'):
+for file in glob.glob('..//results//yaxis*035Hz*.csv'):
     freq = file[18:21]
     df = pd.read_csv(file)
     plt.errorbar(x=np.multiply(df['Voltage p2p (V)'], conv_factor_v2b(df)), 
@@ -155,7 +155,7 @@ for file in glob.glob('..//results//xaxis*035Hz*.csv'):
                  label='{} Hz'.format(freq))
 # plt.plot(Bin, Bin, 'k--')
 plt.plot(voltages, Btheory, 'k--', label='Biot Savart Law')
-plt.xlabel('Input Magnetic Peak-to-Peak Voltage (nT)')
+plt.xlabel('Input Magnetic Peak-to-Peak Amplitude (nT)')
 plt.ylabel('Measured Magnetic Peak-to-Peak Amplitude (nT)')
 plt.grid()
 plt.tight_layout()
