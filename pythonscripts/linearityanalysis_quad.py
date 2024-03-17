@@ -151,15 +151,15 @@ def fitfunc(V, a, b):
     return a * V + b
 
 # function to get convert factor from input voltage axis to input magnetic field 
-def conv_factor_v2b(df):
-    popt, pcov = optimize.curve_fit(fitfunc, df['Voltage p2p (V)'][:10],
-                           df['Magnetic Field p2p (nT)'][:10], sigma=df['Magnetic Uncertainty (nT)'][:10],
+def conv_factor_v2b(df, cutoff_idx):
+    popt, pcov = optimize.curve_fit(fitfunc, df['Voltage p2p (V)'][:cutoff_idx],
+                           df['Magnetic Field p2p (nT)'][:cutoff_idx], sigma=df['Magnetic Uncertainty (nT)'][:cutoff_idx],
                            absolute_sigma=True)
     return popt[0]
 
 #%%
 plt.figure()
-plt.errorbar(x=np.multiply(results['Voltage p2p (V)'], conv_factor_v2b(results)), 
+plt.errorbar(x=np.multiply(results['Voltage p2p (V)'], conv_factor_v2b(results, 7)), 
              y=results['Magnetic Field p2p (nT)'], 
              yerr=results['Magnetic Uncertainty (nT)'],
              capsize=3,
@@ -185,17 +185,18 @@ Btheory = mu0 * (voltages / res) / 4 / rad * 1e9
 
 
 plt.figure()
-for file in glob.glob('..//results//*035Hz*quad.csv'):
+for file in glob.glob('..//results//*035Hz*final*quad*.csv'):
     freq = file[18:21]
+    axis = file[12]
     df = pd.read_csv(file)
-    plt.errorbar(x=np.multiply(df['Voltage p2p (V)'], conv_factor_v2b(df)), 
+    plt.errorbar(x=np.multiply(df['Voltage p2p (V)'], conv_factor_v2b(df, 7)), 
                  y=df['Magnetic Field p2p (nT)'], 
                  yerr=df['Magnetic Uncertainty (nT)'],
                  capsize=1,
-                 fmt='o--',
+                 fmt='o',
                  markersize=2,
-                 label='{} Hz'.format(freq))
-#plt.plot(np.multiply(df['Voltage p2p (V)'], conv_factor_v2b(df)), np.multiply(df['Voltage p2p (V)'], conv_factor_v2b(df)), 'k--')
+                 label='{} Hz {} axis'.format(freq, axis))
+plt.plot(np.multiply(df['Voltage p2p (V)'], conv_factor_v2b(df, 5)), np.multiply(df['Voltage p2p (V)'], conv_factor_v2b(df, 5)), 'k--')
 #plt.plot(voltages, Btheory, 'k--', label='Biot Savart Law')
 plt.xlabel('Input Magnetic Peak-to-Peak Voltage (nT)')
 plt.ylabel('Measured Magnetic Peak-to-Peak Amplitude (nT)')
@@ -205,12 +206,30 @@ plt.legend()
 #plt.gca().set_aspect("equal")
 plt.show()
 
-#%% compare amplitude between axis for same input voltage
-dfx = pd.read_csv('..//data//mar14//xaxis_35Hz//0.70-240314T121701.csv')
-dfz = pd.read_csv('..//data//mar12//zaxis_35Hz//0.70-240312T154016.csv')
-plt.figure()
-plt.plot(dfx['x'], label='x')
-plt.plot(dfz['z'], label='z')
-plt.legend()
-plt.show()
+#%% residual graph
+cutoff_idx = 10
+df = pd.read_csv('..//results//xaxis_035Hz_final_quadfit.csv')
+popt, pcov = optimize.curve_fit(fitfunc, df['Voltage p2p (V)'][:cutoff_idx],
+                       df['Magnetic Field p2p (nT)'][:cutoff_idx], sigma=df['Magnetic Uncertainty (nT)'][:cutoff_idx],
+                       absolute_sigma=True)
+fig, axs = plt.subplots(1, 2, figsize=(12, 6))
+axs[0].errorbar(df['Voltage p2p (V)'], df['Magnetic Field p2p (nT)'], 
+                yerr=df['Magnetic Uncertainty (nT)'], fmt='o', markersize=2, label='')
+axs[0].plot(df['Voltage p2p (V)'], fitfunc(df['Voltage p2p (V)'], *popt), 'k--', label='Fit based on first 10 points')
+axs[0].set_xlim(right=11)
+axs[0].set_ylim(top=10)
+axs[0].set_ylabel('Measured Magnetic Peak-to-Peak Amplitude (nT)')
+axs[0].set_xlabel('Input Magnetic Peak-to-Peak Voltage (nT)')
+axs[0].legend()
+axs[0].grid()
 
+residuals = (fitfunc(df['Voltage p2p (V)'], *popt) - df['Magnetic Field p2p (nT)'])[:cutoff_idx]
+axs[1].errorbar(x=df['Voltage p2p (V)'][:cutoff_idx], y=residuals, 
+                yerr=df['Magnetic Uncertainty (nT)'][:cutoff_idx], fmt='o', 
+                capsize=3, color='C0')
+axs[1].axhline(0, -1, 11, linewidth=2, color='Black')
+axs[1].set_xlabel('Input Magnetic Peak-to-Peak Voltage in the Linear Regime (nT)')
+axs[1].set_ylim(-0.025, 0.025)
+axs[1].grid()
+plt.tight_layout()
+fig.show()
