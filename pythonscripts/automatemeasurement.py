@@ -41,7 +41,7 @@ awg.query('*IDN?')
 
 #%%
 # QZFM
-q = QZFM('COM3')
+q = QZFM('COM4')
 #%%
 q.auto_start(zero_calibrate=False)
 
@@ -267,14 +267,14 @@ gain_dict = {'0.1x':0.27,
              '0.33x':0.9,
              '1x':2.7,
              '3x':8.1}
-# q.set_gain(gain)
+q.set_gain(gain)
 zero_t = 8
 t = 5 # number of seconds to record
-axis = 'y' # axis being measured
+axis = 'z' # axis being measured
 
 # save file settings
 save = True # save as csv if True
-fp = '..//data//mar15//'
+fp = '..//data//AAY4//mar19//'
 
 # dictionary of axis and corresponding labjack channel
 ljch = {'x':'AIN0',
@@ -292,10 +292,11 @@ if __name__ == '__main__':
             imp = np.sqrt(res**2+1/(2*np.pi*freq*cap)**2)
         if not hp:
             imp = r
+        awg.set_ch_state(ch, False)
         awg.set_impedance(ch, imp)
         awg.set_wave(ch, waveform, freq, vpp, offset, phase=0)
         # iterable of Vpp values to output
-        vpps = np.linspace(0.1, 2, 50, endpoint=False)
+        vpps = np.linspace(3.6, 12, 75, endpoint=False)
         i = 0
         progress = tqdm(leave=False, total=99, desc='Experiment Running')
         # make folder and get folder name 
@@ -353,6 +354,11 @@ if __name__ == '__main__':
 
 
 #%%
+t = 2
+axis = 'z'
+ljch = {'x':'AIN0',
+        'y':'AIN1',
+        'z':'AIN2'}
 # zero 
 q.field_zero(True, show=False)
 # sleep 10 seconds

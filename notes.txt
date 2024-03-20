@@ -54,4 +54,9 @@ Mar 14th
 Mar 15th
 3 measurements, really detailed, at 40 Hz, 100 data points per, 4 seconds of quspin reading per
 
-
+Mar 18th
+- take off MSR door (done)
+- put away sensor AAL9 (done)
+- unpack sensor AAY4 and install in (done)
+- measure sweep, x, y, z
+- 
